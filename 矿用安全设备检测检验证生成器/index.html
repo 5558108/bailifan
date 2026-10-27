@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>矿用安全设备检验证 · 二维码生成器</title>
+<style>
+  :root{--blue:#1a4fa0;--blue-d:#123a78;--bg:#f2f5fa;--line:#d8e0ec;--muted:#6b7280}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:#1f2937;font:14px/1.5 "Microsoft YaHei",sans-serif}
+  header{background:linear-gradient(90deg,var(--blue-d),var(--blue));color:#fff;padding:12px 20px;position:sticky;top:0;z-index:20}
+  header h1{margin:0;font-size:17px}
+  main{display:flex;gap:16px;padding:16px;max-width:1300px;margin:0 auto;align-items:flex-start}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px}
+  .form{flex:1;min-width:400px} .preview{width:460px;position:sticky;top:16px;display:flex;flex-direction:column;gap:12px}
+  label.lb{display:block;font-size:12.5px;font-weight:600;margin:10px 0 4px;color:#374151}
+  input,select,textarea{width:100%;padding:7px 9px;border:1px solid #c8d3e6;border-radius:6px;font:inherit;font-size:13px}
+  textarea{font-family:Consolas,monospace;font-size:12px;min-height:80px}
+  .btn{padding:9px 16px;border-radius:7px;border:1px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer;font-weight:600;margin-top:10px}
+  .btn.ghost{background:#fff;color:var(--blue)}
+  #cvWrap{background:#e9edf5;border-radius:8px;padding:10px;display:flex;justify-content:center}
+  canvas{max-width:100%;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+  .qrinfo{font-size:12px;color:var(--muted);background:#f7f9fd;border:1px solid var(--line);border-radius:8px;padding:8px}
+  .ok{color:#15803d;font-weight:600} .warn{color:#b45309;font-weight:600}
+  .hint{font-size:11.5px;color:var(--muted);line-height:1.7}
+</style>
+</head>
+<body>
+<header><h1>矿用安全设备检验证 · 二维码生成器</h1></header>
+<main>
+  <section class="panel form">
+    <label class="lb">报告编号（用于生成网址 + JSON 文件名）</label>
+    <input id="reportNo" value="MACC-06-FZ-25-157">
+    <label class="lb">托管后的报告页地址前缀（必填）</label>
+    <input id="webPrefix" value="https://你的用户名.github.io/你的仓库/r.html?no=">
+    <div class="hint">例：https://abc.github.io/kuangzheng/r.html?no=</div>
+
+    <hr style="margin:16px 0;border:none;border-top:1px solid var(--line)">
+    <label class="lb">机构名称</label><input id="org" value="安徽矿安检测技术服务有限公司">
+    <label class="lb">委托单位</label><input id="client" value="内蒙古安标检验认证有限公司">
+    <label class="lb">项目所属行业</label><input id="industry" value="煤矿">
+    <label class="lb">检测内容</label><input id="checkItem" value="矿用本安型监控分站(2#)">
+    <label class="lb">检测检验机构</label><input id="checkOrg" value="安徽矿安检测技术服务有限公司">
+    <label class="lb">机构资质证书编号</label><input id="qualNo" value="皖煤监2003">
+    <label class="lb">资质有效期至</label><input id="validTo" value="2030年11月04日">
+    <label class="lb">检测人员-组长</label><input id="leader" value="郭洪祥">
+    <label class="lb">检测人员-成员</label><input id="members" value="徐伟">
+    <label class="lb">技术负责人</label><input id="techDir" value="陈刚">
+    <label class="lb">授权签字人</label><input id="signer" value="高山">
+    <label class="lb">检测检验时间</label><input id="date" value="2025年11月05日">
+    <label class="lb">报告出具时间</label><input id="issueDate" value="2025年12月11日">
+    <label class="lb">检测检验结论</label><textarea id="result" rows="2">所检项目符合MT/T 1005-2006的相关要求。</textarea>
+    <label class="lb">联系电话（可选）</label><input id="tel" value="0319-8888888">
+    <label class="lb">现场照片 URL（可选，留空则显示"暂无影像"）</label><input id="photo" value="">
+
+    <label class="lb">二维码边长（mm）</label><input id="size" value="50">
+    <label class="lb">纠错等级</label>
+    <select id="level"><option value="L">L</option><option value="M" selected>M</option><option value="Q">Q</option><option value="H">H</option></select>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="gen()">生成二维码</button>
+      <button class="btn ghost" onclick="exportJSON()">导出报告 JSON</button>
+      <button class="btn ghost" onclick="exportPNG()">导出二维码 PNG</button>
+    </div>
+    <div class="hint" style="margin-top:10px">
+      用法：① 填好内容 → 点「生成二维码」；② 点「导出报告 JSON」，文件名自动为报告号；<br>
+      ③ 把本页 JSON 和 <code>r.html</code> 一起上传到托管目录；④ 二维码指向 <code>webPrefix + 报告号</code>，扫码即打开带框线表格。
+    </div>
+  </section>
+
+  <section class="panel preview">
+    <div id="cvWrap"><canvas id="cv"></canvas></div>
+    <div class="qrinfo" id="info"></div>
+    <label class="lb">二维码内容</label>
+    <textarea id="qrText" readonly rows="3"></textarea>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+if(typeof qrcode==='undefined'){document.body.innerHTML='<div style="padding:40px">需联网加载一次二维码库，请检查网络后刷新。</div>';}
+function v(id){return (document.getElementById(id).value||'').trim();}
+function buildURL(){
+  var pre=v('webPrefix'), no=v('reportNo');
+  if(!pre)return '';
+  return pre + encodeURIComponent(no);
+}
+function buildJSON(){
+  return {
+    org:v('org'), checkOrg:v('checkOrg'), client:v('client'), industry:v('industry'),
+    checkItem:v('checkItem'), qualNo:v('qualNo'), validTo:v('validTo'),
+    leader:v('leader'), members:v('members'), techDir:v('techDir'), signer:v('signer'),
+    reportNo:v('reportNo'), date:v('date'), issueDate:v('issueDate'),
+    result:v('result'), tel:v('tel'), photo:v('photo')
+  };
+}
+function gen(){
+  var txt=buildURL();
+  document.getElementById('qrText').value=txt;
+  if(!txt){document.getElementById('info').innerHTML='<span class="warn">请填写报告页地址前缀</span>';return;}
+  var level=document.getElementById('level').value;
+  var mm=parseFloat(document.getElementById('size').value)||50;
+  var qr;
+  try{qr=qrcode(0,level);qr.addData(txt);qr.make();}
+  catch(e){document.getElementById('info').innerHTML='<span class="warn">内容过长，生成失败</span>';return;}
+  var n=qr.getModuleCount(),quiet=4,total=n+quiet*2;
+  var k=300/25.4,px=Math.round(mm*k),cell=px/total;
+  var cv=document.getElementById('cv');cv.width=px;cv.height=px;
+  var ctx=cv.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,px,px);ctx.fillStyle='#000';
+  var p=Math.max(1,Math.ceil(cell));
+  for(var r=0;r<n;r++)for(var c=0;c<n;c++){
+    if(qr.isDark(r,c))ctx.fillRect(Math.round((c+quiet)*cell),Math.round((r+quiet)*cell),p,p);
+  }
+  var modMM=mm/total;
+  var verdict=modMM>=0.75?'<span class="ok">微信可稳定扫码</span>':'<span class="warn">码点偏小，建议边长加到 50mm 以上</span>';
+  document.getElementById('info').innerHTML='模块 '+n+'×'+n+'　边长 '+mm+'mm　<b>每码点 '+modMM.toFixed(2)+'mm</b><br>'+verdict;
+}
+function exportJSON(){
+  var data=buildJSON();
+  var no=data.reportNo||'report';
+  var b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=no+'.json';a.click();
+}
+function exportPNG(){
+  var cv=document.getElementById('cv');
+  cv.toBlob(function(b){
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(b);a.download='二维码_'+v('reportNo')+'.png';a.click();
+  },'image/png');
+}
+gen();
+</script>
+</body>
+</html>
