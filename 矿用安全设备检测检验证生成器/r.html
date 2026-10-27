@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>检验报告</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:#eef1f5;color:#1f2937;
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  .top{background:#111;color:#fff;display:flex;align-items:center;padding:12px 14px;position:sticky;top:0;z-index:9}
+  .top .x{font-size:22px;line-height:1;margin-right:12px;opacity:.9}
+  .top .t{font-size:16px;font-weight:600}
+  .top .h{margin-left:auto;font-size:11px;color:#aaa}
+  .page{background:#fff;min-height:100vh;padding:24px 14px 40px}
+  h2{margin:6px 0 26px;text-align:center;font-size:17px;font-weight:700;letter-spacing:.4px}
+  table{width:100%;border-collapse:collapse;table-layout:fixed;border:1px solid #cfd6e0}
+  td{border:1px solid #cfd6e0;padding:11px 8px;vertical-align:middle;font-size:14px;text-align:center;word-break:break-all;line-height:1.5}
+  td.lab{background:#fafbfc;color:#3b4351}
+  td.sec{padding:0 4px;font-size:13px;line-height:1.5;background:#fafbfc}
+  td.sec span{display:inline-block;width:18px;margin:0 auto}
+  .left{text-align:left!important;line-height:1.9}
+  .shot{max-width:100%;border-radius:4px;display:block;margin:4px auto}
+  .empty{color:#aab;padding:22px 0}
+  .foot{color:#8a94a6;font-size:12px;text-align:center;margin-top:22px;line-height:1.9}
+  .loading{text-align:center;color:#8a94a6;padding:70px 0}
+</style>
+</head>
+<body>
+<div class="top"><span class="x">×</span><span class="t">检验报告</span><span class="h" id="host"></span></div>
+<div class="page" id="app"><div class="loading">加载中…</div></div>
+<script>
+document.getElementById('host').textContent=location.host;
+var $=function(s){return document.querySelector(s);};
+var esc=function(s){return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+function getNo(){
+  var u=new URL(location.href);
+  var no=u.searchParams.get('no')||u.searchParams.get('reportNo');
+  if(!no){
+    var seg=u.pathname.split('/').filter(Boolean).pop()||'';
+    no=decodeURIComponent(seg.replace(/\.(html?|json)$/i,''));
+  }
+  return no;
+}
+function loadData(no){
+  var urls=['./'+encodeURIComponent(no)+'.json','./data/'+encodeURIComponent(no)+'.json'];
+  var i=0;
+  function next(){
+    if(i>=urls.length)return Promise.resolve(null);
+    return fetch(urls[i++],{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(d){return d||next();});
+  }
+  return next();
+}
+function render(d){
+  var org=d.org||d.checkOrg||'检测机构';
+  var shot=d.photo?'<img class="shot" src="'+esc(d.photo)+'" alt="现场影像">':'<div class="empty">暂无影像资料</div>';
+  var rows='';
+  rows+='<tr><td class="sec" rowspan="3"><span>项目概况</span></td><td class="lab">委托单位</td><td colspan="3">'+esc(d.client)+'</td></tr>';
+  rows+='<tr><td class="lab">项目所属行业</td><td colspan="3">'+esc(d.industry)+'</td></tr>';
+  rows+='<tr><td class="lab">检测内容</td><td colspan="3">'+esc(d.checkItem)+'</td></tr>';
+  rows+='<tr><td class="sec" rowspan="8"><span>检测机构及项目组情况</span></td><td class="lab">检测检验机构</td><td colspan="3">'+esc(d.checkOrg||d.org)+'</td></tr>';
+  rows+='<tr><td class="lab">机构资质证书编号</td><td>'+esc(d.qualNo)+'</td><td class="lab">资质有效期至</td><td>'+esc(d.validTo)+'</td></tr>';
+  rows+='<tr><td class="lab" rowspan="2">检测检验人员</td><td class="lab">组长</td><td colspan="2">'+esc(d.leader)+'</td></tr>';
+  rows+='<tr><td class="lab">成员</td><td colspan="2">'+esc(d.members)+'</td></tr>';
+  rows+='<tr><td class="lab">技术负责人</td><td colspan="3">'+esc(d.techDir)+'</td></tr>';
+  rows+='<tr><td class="lab">授权签字人</td><td colspan="3">'+esc(d.signer)+'</td></tr>';
+  rows+='<tr><td class="lab">报告编号</td><td colspan="3">'+esc(d.reportNo)+'</td></tr>';
+  rows+='<tr><td class="lab">检测检验时间</td><td colspan="3">'+esc(d.date)+'</td></tr>';
+  rows+='<tr><td class="lab">报告出具时间</td><td colspan="3">'+esc(d.issueDate)+'</td></tr>';
+  rows+='<tr><td class="sec"><span>检测检验结论</span></td><td colspan="4" class="left">'+esc(d.result)+'</td></tr>';
+  rows+='<tr><td class="sec"><span>检测检验图像影像</span></td><td colspan="4">'+shot+'</td></tr>';
+  $('#app').innerHTML='<h2>'+esc(org)+'</h2><table>'+rows+'</table>'
+    +'<div class="foot">本报告可通过扫描证书二维码核验<br>'+esc(org)+(d.tel?'　'+esc(d.tel):'')+'</div>';
+}
+(function(){
+  var no=getNo();
+  if(!no){$('#app').innerHTML='<div class="loading">缺少报告编号</div>';return;}
+  loadData(no).then(function(d){
+    if(!d){$('#app').innerHTML='<div class="loading">未找到报告：'+esc(no)+'</div>';return;}
+    render(d);
+  });
+})();
+</script>
+</body>
+</html>
